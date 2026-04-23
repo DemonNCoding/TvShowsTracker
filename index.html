@@ -1,0 +1,1624 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TV Shows Tracker</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #10151e;
+      color: #ffffff;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(20, 25, 37, 0.95);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid #1e2739;
+      padding: 12px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 20px;
+      font-weight: 600;
+      color: #ffffff;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .logo svg {
+      width: 24px;
+      height: 24px;
+      color: #4bf364;
+    }
+
+    .search-trigger {
+      width: 40px;
+      height: 40px;
+      border: none;
+      background: #1e2739;
+      border: 1px solid #1e2739;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .search-trigger:hover {
+      background: #171d2b;
+      border-color: #4bf364;
+    }
+
+    .search-trigger svg {
+      width: 18px;
+      height: 18px;
+      color: #cfd4de;
+    }
+
+    .stats-bar {
+      background: #141925;
+      border: 1px solid #1e2739;
+      border-radius: 12px;
+      padding: 16px 24px;
+      margin-bottom: 24px;
+      display: flex;
+      gap: 32px;
+      justify-content: center;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #4bf364;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #6d7790;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+    }
+
+    .search-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 10vh;
+      animation: fadeIn 0.2s;
+    }
+
+    .search-modal.active {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    .search-modal-content {
+      width: 90%;
+      max-width: 700px;
+      background: #171d2b;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      border: 1px solid #1e2739;
+      animation: slideDown 0.3s;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    @keyframes slideDown {
+      from {
+        transform: translateY(-20px);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .search-header {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .search-input {
+      flex: 1;
+      padding: 12px 16px;
+      background: #10151e;
+      border: 1px solid #1e2739;
+      border-radius: 10px;
+      color: #ffffff;
+      font-size: 15px;
+      font-family: 'IBM Plex Sans', sans-serif;
+      transition: all 0.2s;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: #4bf364;
+      box-shadow: 0 0 0 3px rgba(75, 243, 100, 0.1);
+    }
+
+    .btn {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 14px;
+      font-family: 'IBM Plex Sans', sans-serif;
+    }
+
+    .btn-primary {
+      background: #4bf364;
+      color: #000000;
+    }
+
+    .btn-primary:hover {
+      background: #5cf473;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: #1e2739;
+      color: #cfd4de;
+      border: 1px solid #1e2739;
+    }
+
+    .btn-secondary:hover {
+      background: #171d2b;
+      border-color: #4bf364;
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .search-results {
+      max-height: 60vh;
+      overflow-y: auto;
+      margin-top: 16px;
+    }
+
+    .search-results::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .search-results::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .search-results::-webkit-scrollbar-thumb {
+      background: #1e2739;
+      border-radius: 3px;
+    }
+
+    .search-result-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: #10151e;
+      padding: 12px;
+      border-radius: 10px;
+      margin-bottom: 8px;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+
+    .search-result-item:hover {
+      background: #141925;
+      border-color: #1e2739;
+    }
+
+    .search-result-item img {
+      width: 50px;
+      height: 75px;
+      object-fit: cover;
+      border-radius: 8px;
+    }
+
+    .search-result-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .search-result-info h3 {
+      font-size: 16px;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .search-result-info p {
+      color: #6d7790;
+      font-size: 13px;
+    }
+
+    .import-options {
+      background: #10151e;
+      border: 1px solid #1e2739;
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+
+    .import-options h3 {
+      font-size: 16px;
+      margin-bottom: 12px;
+      color: #4bf364;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .import-option-group {
+      margin-bottom: 12px;
+    }
+
+    .import-option-group label {
+      display: block;
+      color: #cfd4de;
+      font-size: 14px;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .import-option-group select {
+      width: 100%;
+      padding: 10px;
+      background: #141925;
+      border: 1px solid #1e2739;
+      border-radius: 8px;
+      color: #cfd4de;
+      font-size: 14px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .import-option-group select:focus {
+      outline: none;
+      border-color: #4bf364;
+    }
+
+    .import-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .container {
+      max-width: 1800px;
+      margin: 0 auto;
+      padding: 24px 32px;
+      display: flex;
+      gap: 24px;
+    }
+
+    .sidebar {
+      width: 280px;
+      flex-shrink: 0;
+    }
+
+    .main-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .sidebar-section {
+      background: #141925;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #1e2739;
+      margin-bottom: 16px;
+    }
+
+    .sidebar-section.sticky {
+      position: sticky;
+      top: 80px;
+      max-height: calc(100vh - 100px);
+      overflow-y: auto;
+    }
+
+    .sidebar-section::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .sidebar-section::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .sidebar-section::-webkit-scrollbar-thumb {
+      background: #1e2739;
+      border-radius: 3px;
+    }
+
+    .sidebar-header {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #4bf364;
+      font-family: 'IBM Plex Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .upcoming-item {
+      background: #10151e;
+      border: 1px solid #1e2739;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
+      transition: all 0.2s;
+    }
+
+    .upcoming-item:hover {
+      background: #171d2b;
+      border-color: #4bf364;
+    }
+
+    .upcoming-item.aired {
+      border-left: 3px solid #4bf364;
+    }
+
+    .upcoming-item.upcoming {
+      border-left: 3px solid #a7caf3;
+    }
+
+    .upcoming-show-name {
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 4px;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      color: #ffffff;
+    }
+
+    .upcoming-episode {
+      font-size: 12px;
+      color: #cfd4de;
+      margin-bottom: 4px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .upcoming-date {
+      font-size: 11px;
+      color: #6d7790;
+    }
+
+    .upcoming-empty {
+      text-align: center;
+      padding: 30px 20px;
+      color: #6d7790;
+      font-size: 13px;
+    }
+
+    .genre-filter {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .genre-filter-tag {
+      padding: 6px 12px;
+      background: #10151e;
+      border: 1px solid #1e2739;
+      border-radius: 8px;
+      font-size: 11px;
+      color: #cfd4de;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+
+    .genre-filter-tag:hover {
+      border-color: #4bf364;
+    }
+
+    .genre-filter-tag.active {
+      background: #4bf364;
+      color: #000000;
+      border-color: #4bf364;
+    }
+
+    .controls-bar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .local-search {
+      position: relative;
+      margin-bottom: 16px;
+    }
+
+    .local-search-input {
+      width: 100%;
+      padding: 12px 40px 12px 16px;
+      background: #141925;
+      border: 1px solid #1e2739;
+      border-radius: 10px;
+      color: #ffffff;
+      font-size: 14px;
+      font-family: 'IBM Plex Sans', sans-serif;
+      transition: all 0.2s;
+    }
+
+    .local-search-input:focus {
+      outline: none;
+      border-color: #4bf364;
+      box-shadow: 0 0 0 3px rgba(75, 243, 100, 0.1);
+    }
+
+    .local-search-input::placeholder {
+      color: #6d7790;
+    }
+
+    .local-search-clear {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      border: none;
+      background: #1e2739;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s;
+    }
+
+    .local-search-clear.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .local-search-clear:hover {
+      background: #4bf364;
+    }
+
+    .local-search-clear svg {
+      width: 12px;
+      height: 12px;
+      color: #cfd4de;
+    }
+
+    .local-search-clear:hover svg {
+      color: #000000;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      background: #141925;
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid #1e2739;
+    }
+
+    .tab {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: #6d7790;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+      font-size: 14px;
+      font-family: 'IBM Plex Sans', sans-serif;
+    }
+
+    .tab.active {
+      background: #4bf364;
+      color: #000000;
+    }
+
+    .sort-select {
+      padding: 10px 16px;
+      background: #141925;
+      border: 1px solid #1e2739;
+      border-radius: 10px;
+      color: #cfd4de;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-weight: 500;
+      margin-left: auto;
+    }
+
+    .sort-select:focus {
+      outline: none;
+      border-color: #4bf364;
+    }
+
+    .shows-grid {
+      display: grid !important;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
+      gap: 16px !important;
+      width: 100% !important;
+    }
+
+    @media (max-width: 600px) {
+      .shows-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+      }
+
+      .container {
+        padding: 12px !important;
+      }
+
+      .show-card-content {
+        padding: 8px !important;
+      }
+
+      .show-card h3 {
+        font-size: 14px !important;
+      }
+
+      .show-image-container {
+        height: 120px !important;
+      }
+
+      .progress-value {
+        font-size: 12px !important;
+      }
+
+      .control-btn {
+        padding: 6px !important;
+        font-size: 10px !important;
+      }
+    }
+
+    .show-card {
+      background: #141925;
+      border-radius: 12px;
+      overflow: hidden;
+      transition: all 0.2s;
+      border: 1px solid #1e2739;
+      position: relative;
+    }
+
+    .show-card:hover {
+      border-color: #4bf364;
+    }
+
+    .show-image-container {
+      position: relative;
+      width: 100%;
+      height: 160px;
+      overflow: hidden;
+      background: #1a1a22;
+    }
+
+    .show-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .show-status-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.6);
+    }
+
+    .show-status-badge.running {
+      background: rgba(75, 243, 100, 0.9);
+      color: #000000;
+      border-color: #4bf364;
+    }
+
+    .show-status-badge.ended {
+      background: rgba(109, 119, 144, 0.9);
+      color: #ffffff;
+      border-color: #6d7790;
+    }
+
+    .show-rating {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(0, 0, 0, 0.8);
+      color: #4bf364;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .show-settings-btn {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: rgba(0, 0, 0, 0.8);
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: all 0.2s;
+    }
+
+    .show-card:hover .show-settings-btn {
+      opacity: 1;
+    }
+
+    .show-settings-btn:hover {
+      background: #4bf364;
+    }
+
+    .show-settings-btn svg {
+      width: 16px;
+      height: 16px;
+      color: #cfd4de;
+    }
+
+    .show-settings-btn:hover svg {
+      color: #000000;
+    }
+
+    .show-card-content {
+      padding: 16px;
+    }
+
+    .show-card h3 {
+      font-size: 17px;
+      margin-bottom: 10px;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      font-weight: 600;
+    }
+
+    .show-genres {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .genre-tag {
+      background: #1e2739;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 10px;
+      color: #cfd4de;
+      font-weight: 500;
+    }
+
+    .next-episode-box {
+      background: #1e2739;
+      border: 1px solid #1e2739;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 12px;
+    }
+
+    .next-episode-box.aired {
+      background: rgba(75, 243, 100, 0.1);
+      border-color: #4bf364;
+    }
+
+    .next-episode-title {
+      font-weight: 600;
+      font-size: 12px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .next-episode-date {
+      color: #cfd4de;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .badge {
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .badge.aired {
+      background: #4bf364;
+      color: #000000;
+    }
+
+    .badge.upcoming {
+      background: #a7caf3;
+      color: #000000;
+    }
+
+    .progress-section {
+      background: #1e2739;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .progress-label {
+      color: #6d7790;
+      font-size: 12px;
+    }
+
+    .progress-value {
+      font-weight: 700;
+      font-size: 16px;
+      color: #4bf364;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .progress-bar-container {
+      height: 6px;
+      background: #10151e;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4bf364 0%, #5cf473 100%);
+      transition: width 0.3s;
+    }
+
+    .selector-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .season-selector,
+    .episode-selector {
+      min-width: 0;
+    }
+
+    .season-selector select,
+    .episode-selector select {
+      width: 100%;
+      padding: 8px;
+      background: #10151e;
+      border: 1px solid #171d2b;
+      border-radius: 6px;
+      color: #cfd4de;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: 'IBM Plex Mono', monospace;
+      font-weight: 600;
+    }
+
+    .season-selector select:focus,
+    .episode-selector select:focus {
+      outline: none;
+      border-color: #4bf364;
+    }
+
+    .episode-selector select {
+      font-weight: 500;
+    }
+
+    .episode-selector select option {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .control-btn {
+      padding: 8px;
+      border: none;
+      border-radius: 6px;
+      background: #10151e;
+      color: #cfd4de;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+      transition: all 0.2s;
+      border: 1px solid #171d2b;
+      font-family: 'IBM Plex Sans', sans-serif;
+    }
+
+    .control-btn:hover:not(:disabled) {
+      background: #141925;
+      border-color: #4bf364;
+    }
+
+    .control-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .control-btn.primary {
+      background: #4bf364;
+      color: #000000;
+      border-color: #4bf364;
+    }
+
+    .control-btn.primary:hover:not(:disabled) {
+      background: #5cf473;
+    }
+
+    .bookmark-section {
+      margin-bottom: 12px;
+    }
+
+    .bookmark-link-btn {
+      width: 100%;
+      padding: 8px;
+      background: #1e2739;
+      border: 1px solid #1e2739;
+      border-radius: 6px;
+      color: #4bf364;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .bookmark-link-btn:hover {
+      background: #171d2b;
+      border-color: #4bf364;
+    }
+
+    .bookmark-add-btn {
+      width: 100%;
+      padding: 8px;
+      background: transparent;
+      border: 1px dashed #1e2739;
+      border-radius: 6px;
+      color: #6d7790;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-weight: 500;
+    }
+
+    .bookmark-add-btn:hover {
+      border-color: #4bf364;
+      color: #4bf364;
+    }
+
+    .action-buttons {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+    }
+
+    .btn-delete {
+      padding: 8px 12px;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 600;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 12px;
+    }
+
+    .btn-delete:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+
+    .settings-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.2s;
+    }
+
+    .settings-modal.active {
+      display: flex;
+    }
+
+    .settings-modal-content {
+      width: 90%;
+      max-width: 500px;
+      background: #171d2b;
+      border-radius: 16px;
+      padding: 24px;
+      border: 1px solid #1e2739;
+    }
+
+    .settings-modal h2 {
+      font-size: 18px;
+      margin-bottom: 20px;
+      color: #4bf364;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .settings-group {
+      margin-bottom: 20px;
+    }
+
+    .settings-group label {
+      display: block;
+      color: #cfd4de;
+      font-size: 14px;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .settings-group select,
+    .settings-group input {
+      width: 100%;
+      padding: 10px;
+      background: #10151e;
+      border: 1px solid #1e2739;
+      border-radius: 8px;
+      color: #cfd4de;
+      font-size: 14px;
+      font-family: 'IBM Plex Sans', sans-serif;
+    }
+
+    .settings-group select:focus,
+    .settings-group input:focus {
+      outline: none;
+      border-color: #4bf364;
+    }
+
+    .settings-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      grid-column: 1/-1;
+    }
+
+    .empty-state svg {
+      width: 48px;
+      height: 48px;
+      color: #1e2739;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .empty-state h3 {
+      font-size: 18px;
+      margin-bottom: 8px;
+      color: #6d7790;
+    }
+
+    .empty-state p {
+      color: #6d7790;
+      font-size: 13px;
+    }
+
+    @media (max-width: 1200px) {
+      .container {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      .sidebar-section.sticky {
+        position: static;
+        max-height: none;
+      }
+    }
+
+
+    @media (max-width: 768px) {
+      .sidebar {
+        grid-template-columns: 1fr;
+      }
+
+      .shows-grid {
+        grid-template-columns: 1fr !important;
+      }
+
+      .stats-bar {
+        flex-direction: column;
+        gap: 16px;
+      }
+    }
+
+    .tab-archive {
+      color: #6d7790 !important;
+    }
+
+    .tab-archive.active {
+      background: #a7caf3 !important;
+      color: #000000 !important;
+    }
+
+    /* Smooth transitions for all interactive elements */
+    .show-card {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .control-btn,
+    .btn,
+    .bookmark-link-btn,
+    .bookmark-add-btn,
+    .genre-filter-tag,
+    .upcoming-item,
+    .tab {
+      transition: all 0.2s ease;
+    }
+
+    /* Fade in animation for cards */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .show-card {
+      animation: fadeInUp 0.4s ease backwards;
+    }
+
+    .show-card:nth-child(1) {
+      animation-delay: 0.05s;
+    }
+
+    .show-card:nth-child(2) {
+      animation-delay: 0.1s;
+    }
+
+    .show-card:nth-child(3) {
+      animation-delay: 0.15s;
+    }
+
+    .show-card:nth-child(4) {
+      animation-delay: 0.2s;
+    }
+
+    .show-card:nth-child(5) {
+      animation-delay: 0.25s;
+    }
+
+    .show-card:nth-child(6) {
+      animation-delay: 0.3s;
+    }
+
+    /* Progress bar animation */
+    .progress-bar-fill {
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Button press effect */
+    .control-btn:active,
+    .btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Compact view */
+    .shows-grid.compact {
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)) !important;
+    }
+
+    .shows-grid.compact .show-image-container {
+      height: 120px !important;
+    }
+
+    .shows-grid.compact .show-card-content {
+      padding: 12px !important;
+    }
+
+    .shows-grid.compact h3 {
+      font-size: 15px !important;
+    }
+
+    /* List view */
+    .shows-grid.list {
+      grid-template-columns: 1fr 1fr !important;
+      gap: 16px !important;
+    }
+
+    @media (max-width: 1000px) {
+      .shows-grid.list {
+        grid-template-columns: 1fr !important;
+      }
+    }
+
+    .shows-grid.list .show-card {
+      display: flex !important;
+      flex-direction: row !important;
+      min-height: 280px !important;
+    }
+
+    .shows-grid.list .show-image-container {
+      width: 200px !important;
+      min-height: 280px !important;
+      flex-shrink: 0 !important;
+    }
+
+    .shows-grid.list .show-card-content {
+      flex: 1 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      padding: 20px !important;
+      justify-content: space-between !important;
+    }
+
+    .shows-grid.list .progress-section {
+      margin-bottom: auto !important;
+    }
+
+    .view-btn {
+      transition: all 0.2s;
+    }
+
+    .view-btn svg {
+      color: #6d7790;
+      transition: all 0.2s;
+    }
+
+    .view-btn:hover {
+      background: #1e2739 !important;
+    }
+
+    .view-btn:hover svg {
+      color: #cfd4de;
+    }
+
+    .view-btn.active {
+      background: #4bf364 !important;
+    }
+
+    .view-btn.active svg {
+      color: #000000;
+    }
+
+    /* Data management section */
+    .data-management {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .data-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      background: #10151e;
+      border: 1px solid #1e2739;
+      border-radius: 10px;
+      color: #cfd4de;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: 'IBM Plex Sans', sans-serif;
+      text-align: left;
+    }
+
+    .data-btn:hover {
+      background: #171d2b;
+      border-color: #4bf364;
+      color: #ffffff;
+    }
+
+    .data-btn svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .data-btn.export:hover {
+      border-color: #4bf364;
+    }
+
+    .data-btn.import:hover {
+      border-color: #a7caf3;
+    }
+
+    .data-btn.import:hover svg {
+      color: #a7caf3;
+    }
+
+    .data-btn.export:hover svg {
+      color: #4bf364;
+    }
+
+    /* Toast notifications */
+    .toast {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #1e2739;
+      color: #ffffff;
+      padding: 14px 22px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 500;
+      border: 1px solid #2e3a52;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      z-index: 9999;
+      max-width: 600px;
+      width: max-content;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+
+    .toast.toast-success {
+      border-color: #4bf364;
+      box-shadow: 0 8px 32px rgba(75, 243, 100, 0.15);
+    }
+
+    .toast.toast-success::before {
+      content: '✓ ';
+      color: #4bf364;
+    }
+
+    .toast.toast-warning {
+      border-color: #f59e0b;
+      box-shadow: 0 8px 32px rgba(245, 158, 11, 0.15);
+    }
+
+    .toast.toast-warning::before {
+      content: '⚠ ';
+      color: #f59e0b;
+    }
+
+    .toast.toast-error {
+      border-color: #ef4444;
+      box-shadow: 0 8px 32px rgba(239, 68, 68, 0.15);
+    }
+
+    .toast.toast-error::before {
+      content: '✕ ';
+      color: #ef4444;
+    }
+
+    /* Confirm modal */
+    .confirm-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.15s;
+    }
+
+    .confirm-modal.active {
+      display: flex;
+    }
+
+    .confirm-modal-content {
+      background: #171d2b;
+      border: 1px solid #2e3a52;
+      border-radius: 14px;
+      padding: 28px 28px 22px;
+      max-width: 420px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      animation: slideDown 0.2s;
+    }
+
+    .confirm-modal-content h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #ffffff;
+    }
+
+    .confirm-modal-content p {
+      font-size: 14px;
+      color: #9aa3b8;
+      line-height: 1.6;
+      margin-bottom: 22px;
+      white-space: pre-line;
+    }
+
+    .confirm-modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="top-bar">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+        <polyline points="17 2 12 7 7 2"></polyline>
+      </svg>
+      TV SHOWS TRACKER
+    </div>
+    <button class="search-trigger" id="searchTrigger">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <path d="m21 21-4.35-4.35"></path>
+      </svg>
+    </button>
+  </div>
+
+  <div class="search-modal" id="searchModal">
+    <div class="search-modal-content">
+      <div class="search-header">
+        <input type="text" id="searchInput" class="search-input" placeholder="Search TV shows..." autocomplete="off">
+        <button id="searchBtn" class="btn btn-primary">Search</button>
+      </div>
+      <div id="searchResults" class="search-results"></div>
+    </div>
+  </div>
+
+  <div class="settings-modal" id="settingsModal">
+    <div class="settings-modal-content">
+      <h2>Show Settings</h2>
+      <div id="settingsContent"></div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="sidebar">
+      <div class="sidebar-section sticky">
+        <div class="sidebar-header">📅 Coming Up</div>
+        <div id="upcomingList"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-header">🎭 Filter by Genre</div>
+        <div id="genreFilter" class="genre-filter"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-header">📤 Data Management</div>
+        <div class="data-management">
+          <button class="data-btn export" id="exportBtn" title="Export your shows and settings to a JSON file">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Export Data
+          </button>
+          <button class="data-btn import" id="importBtn" title="Import shows and settings from a JSON file">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            Import Data
+          </button>
+          <input type="file" id="importFileInput" accept=".json" style="display: none;">
+        </div>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <div class="stats-bar">
+        <div class="stat-item">
+          <div class="stat-value" id="totalShows">0</div>
+          <div class="stat-label">Total Shows</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="totalEpisodes">0</div>
+          <div class="stat-label">Episodes Watched</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="totalHours">0h</div>
+          <div class="stat-label">Est. Hours Watched</div>
+        </div>
+      </div>
+
+      <div class="local-search">
+        <input type="text" id="localSearchInput" class="local-search-input" placeholder="Filter shows by name..." autocomplete="off">
+        <button class="local-search-clear" id="localSearchClear" title="Clear search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="controls-bar">
+        <div class="tabs">
+          <button class="tab active" data-tab="watching">
+            Watching <span id="watchingCount">0</span>
+          </button>
+          <button class="tab" data-tab="waiting">
+            Waiting <span id="waitingCount">0</span>
+          </button>
+          <button class="tab tab-archive" data-tab="completed">
+            Completed <span id="completedCount">0</span>
+          </button>
+        </div>
+
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="btn-secondary" id="updateAllBtn" style="padding: 8px 12px; font-size: 12px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+              <path d="M21 3v5h-5"></path>
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+              <path d="M3 21v-5h5"></path>
+            </svg>
+            Update All Shows
+          </button>
+
+          <div class="view-toggle"
+            style="display: flex; gap: 4px; background: #141925; padding: 4px; border-radius: 8px; border: 1px solid #1e2739;">
+            <button class="view-btn active" data-view="grid" title="Grid View"
+              style="width: 32px; height: 32px; border: none; background: transparent; cursor: pointer; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+            </button>
+            <button class="view-btn" data-view="compact" title="Compact View"
+              style="width: 32px; height: 32px; border: none; background: transparent; cursor: pointer; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+                <rect x="10" y="10" width="4" height="4"></rect>
+              </svg>
+            </button>
+            <button class="view-btn" data-view="list" title="List View"
+              style="width: 32px; height: 32px; border: none; background: transparent; cursor: pointer; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6"></line>
+                <line x1="8" y1="12" x2="21" y2="12"></line>
+                <line x1="8" y1="18" x2="21" y2="18"></line>
+                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+
+          <select class="sort-select" id="sortSelect">
+            <option value="name">Sort by Name</option>
+            <option value="updated">Recently Updated</option>
+            <option value="next">Next Episode</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="showsGrid" class="shows-grid"></div>
+    </div>
+  </div>
+
+  <!-- Custom confirm dialog -->
+  <div class="confirm-modal" id="confirmModal">
+    <div class="confirm-modal-content">
+      <h3 id="confirmTitle">Are you sure?</h3>
+      <p id="confirmMessage"></p>
+      <div class="confirm-modal-actions">
+        <button class="btn btn-secondary" id="confirmCancelBtn">Cancel</button>
+        <button class="btn btn-primary" id="confirmOkBtn">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
