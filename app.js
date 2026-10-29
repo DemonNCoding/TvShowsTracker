@@ -37,6 +37,16 @@ function setupEventListeners() {
     }
   });
 
+  const newEpisodesModal = document.getElementById('newEpisodesModal');
+  newEpisodesModal.addEventListener('click', (e) => {
+    if (e.target === newEpisodesModal) {
+      newEpisodesModal.classList.remove('active');
+    }
+  });
+  document.getElementById('newEpisodesOkBtn').addEventListener('click', () => {
+    newEpisodesModal.classList.remove('active');
+  });
+
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (searchModal.classList.contains('active')) {
@@ -44,6 +54,9 @@ function setupEventListeners() {
       }
       if (settingsModal.classList.contains('active')) {
         settingsModal.classList.remove('active');
+      }
+      if (newEpisodesModal.classList.contains('active')) {
+        newEpisodesModal.classList.remove('active');
       }
     }
   });
@@ -668,10 +681,34 @@ function getSeasonInfo(show) {
 
   const seasons = Object.keys(show.episodeData).map(Number).sort((a, b) => a - b);
   const maxSeasons = seasons.length;
-  const maxEpisodes = show.episodeData[show.currentSeason].length;
+  const seasonEpisodes = show.episodeData[show.currentSeason];
+  const maxEpisodes = seasonEpisodes.length;
+
+  // Progress spans the whole season, including episodes that are scheduled but
+  // not aired yet, so the bar only fills as the season is actually watched.
   const progress = maxEpisodes > 0 ? (show.currentEpisode / maxEpisodes) * 100 : 0;
 
   return { maxEpisodes, maxSeasons, seasons, progress };
+}
+
+// ── Episode air-date helpers ───────────────────────────────────────────────
+// The calendar date (YYYY-MM-DD) an episode is available under this show's air
+// day offset, or null when TVMaze has not scheduled it yet (TBA). Shared by the
+// "next episode" card and new-episode detection so both agree on what is out.
+function getEpisodeAirDate(show, ep) {
+  if (!ep || !ep.airdate) return null;
+  const d = new Date(ep.airdate + 'T00:00:00');
+  d.setDate(d.getDate() + (show.airDayOffset || 0));
+  return d.toISOString().split('T')[0];
+}
+
+function todayDateString() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function hasEpisodeAired(show, ep) {
+  const dateStr = getEpisodeAirDate(show, ep);
+  return dateStr !== null && dateStr <= todayDateString();
 }
 
 function getNextEpisodeInfo(show) {
@@ -685,7 +722,24 @@ function getNextEpisodeInfo(show) {
 
   if (currentEpIndex === -1) return null;
 
-  const nextEp = show.allEpisodes[currentEpIndex + 1];
+  let nextEp = show.allEpisodes[currentEpIndex + 1];
+
+  // Fallback: brand-new / upcoming season where only a couple of episodes are
+  // scheduled. When we're on the last known episode of a *running* show, keep
+  // showing the air info for that last scheduled episode instead of dropping
+  // the "coming soon" box. Prevents e.g. Grey's Anatomy's "Available Oct 15"
+  // from vanishing when you select the upcoming Season 23.
+  if (!nextEp && show.showStatus === 'Running') {
+    const lastEp = show.allEpisodes[show.allEpisodes.length - 1];
+    if (lastEp) {
+      const lastDateStr = getEpisodeAirDate(show, lastEp);
+      // Only use it if it hasn't aired yet (or the air date is unknown,
+      // i.e. TBA). If it already aired, it's genuinely "no more episodes".
+      if (!lastDateStr || lastDateStr > todayDateString()) {
+        nextEp = lastEp;
+      }
+    }
+  }
 
   if (!nextEp) {
     return {
@@ -705,13 +759,8 @@ function getNextEpisodeInfo(show) {
     };
   }
 
-  // Apply air day offset
-  const adjustedDate = new Date(airDate + 'T00:00:00');
-  adjustedDate.setDate(adjustedDate.getDate() + (show.airDayOffset || 0));
-  const adjustedDateStr = adjustedDate.toISOString().split('T')[0];
-
-  const today = new Date().toISOString().split('T')[0];
-  const hasAired = adjustedDateStr <= today;
+  const adjustedDateStr = getEpisodeAirDate(show, nextEp);
+  const hasAired = hasEpisodeAired(show, nextEp);
 
   const prefix = show.airDayOffset > 0 ? 'Available ' : 'Airs ';
 
@@ -867,7 +916,7 @@ function renderShows() {
       nextEpisodeHTML = `
         <div class="next-episode-box ${boxClass}">
           <div class="next-episode-title">
-            <span>S${nextEpInfo.season}E${nextEpInfo.episode} • ${nextEpInfo.title}</span>
+            <span title="${escHtml(nextEpInfo.title || '')}">S${nextEpInfo.season}E${nextEpInfo.episode} • ${nextEpInfo.title}</span>
             <span class="badge ${badgeClass}">${badgeText}</span>
           </div>
           <div class="next-episode-date">${nextEpInfo.message}</div>
@@ -1183,7 +1232,7 @@ async function updateAllShows(options = {}) {
   const snapshot = {};
   shows.forEach(show => {
     snapshot[show.id] = {
-      episodeCount: show.allEpisodes ? show.allEpisodes.length : 0,
+      episodeIds: new Set((show.allEpisodes || []).map(ep => ep.id)),
       showStatus: show.showStatus || 'Unknown'
     };
   });
@@ -1210,6 +1259,9 @@ async function updateAllShows(options = {}) {
 
   let updatedCount = 0;
   let errorCount = 0;
+  const autoMovedShows = [];
+  const newEpisodes = [];
+  const upcomingEpisodes = [];
 
   try {
     const batchSize = 5;
@@ -1225,11 +1277,24 @@ async function updateAllShows(options = {}) {
           ]);
 
           if (episodeData && episodeData.seasonData && showData) {
+            const knownIds = snapshot[show.id]?.episodeIds || new Set();
             show.episodeData = episodeData.seasonData;
             show.allEpisodes = episodeData.allEpisodes;
             show.showStatus = showData.status || 'Unknown';
             show.rating = showData.rating?.average || null;
             show.lastUpdated = Date.now();
+
+            // Auto-move waiting shows to watching only once an episode has
+            // actually aired. TVMaze lists scheduled future episodes, so a new
+            // count alone does not mean the show is back.
+            const released = show.allEpisodes.filter(
+              ep => !knownIds.has(ep.id) && hasEpisodeAired(show, ep)
+            );
+            if (show.status === 'waiting' && released.length > 0) {
+              show.status = 'watching';
+              autoMovedShows.push(show.name);
+            }
+
             updatedCount++;
           } else {
             errorCount++;
@@ -1262,14 +1327,35 @@ async function updateAllShows(options = {}) {
 
     // ── Detect what changed ───────────────────────────────────────────────
     let newEpisodesTotal = 0;
+    let upcomingEpisodesTotal = 0;
     const statusChanges = [];
     shows.forEach(show => {
       const prev = snapshot[show.id];
       if (!prev) return;
-      const newCount = show.allEpisodes ? show.allEpisodes.length : 0;
-      if (newCount > prev.episodeCount) {
-        newEpisodesTotal += newCount - prev.episodeCount;
-      }
+      const knownIds = prev.episodeIds;
+      const added = (show.allEpisodes || []).filter(ep => !knownIds.has(ep.id));
+
+      // Capture the newly added episodes, split into released and scheduled.
+      // TVMaze lists future episodes too; only an aired episode is out.
+      added.forEach(ep => {
+        const released = hasEpisodeAired(show, ep);
+        const entry = {
+          showName: show.name,
+          season: ep.season,
+          number: ep.number,
+          name: ep.name,
+          airdate: getEpisodeAirDate(show, ep),
+          released
+        };
+        if (released) {
+          newEpisodesTotal++;
+          newEpisodes.push(entry);
+        } else {
+          upcomingEpisodesTotal++;
+          upcomingEpisodes.push(entry);
+        }
+      });
+
       if (show.showStatus && show.showStatus !== prev.showStatus && prev.showStatus !== 'Unknown') {
         statusChanges.push(`${show.name}: ${prev.showStatus} → ${show.showStatus}`);
       }
@@ -1280,10 +1366,17 @@ async function updateAllShows(options = {}) {
     parts.push(`${updatedCount} show${updatedCount !== 1 ? 's' : ''} updated`);
     if (errorCount > 0) parts.push(`${errorCount} failed`);
     if (newEpisodesTotal > 0) parts.push(`${newEpisodesTotal} new episode${newEpisodesTotal !== 1 ? 's' : ''} available`);
+    if (upcomingEpisodesTotal > 0) parts.push(`${upcomingEpisodesTotal} upcoming episode${upcomingEpisodesTotal !== 1 ? 's' : ''} scheduled`);
     if (statusChanges.length > 0) parts.push(statusChanges.join(', '));
+    if (autoMovedShows.length > 0) parts.push(`▶ Moved to Watching: ${autoMovedShows.join(', ')}`);
 
     const toastType = errorCount > 0 && updatedCount === 0 ? 'error' : newEpisodesTotal > 0 ? 'success' : 'success';
     showToast(parts.join(' • '), toastType);
+
+    // Show a detailed list of which episodes are new
+    if (newEpisodes.length > 0 || upcomingEpisodes.length > 0) {
+      showNewEpisodesModal(newEpisodes, upcomingEpisodes);
+    }
 
     btn.innerHTML = `
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
@@ -1370,4 +1463,76 @@ async function importData(file) {
     console.error('Import failed:', error);
     showToast('Import failed. Please try again.', 'error');
   }
+}
+// ── HTML escape helper (for safe rendering of episode/show names) ──────────
+function escHtml(str) {
+  if (typeof str !== 'string') return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ── New Episodes modal ──────────────────────────────────────────────────────
+function showNewEpisodesModal(episodes, upcomingEpisodes = []) {
+  const modal = document.getElementById('newEpisodesModal');
+  if (!modal) return;
+
+  const listEl = document.getElementById('newEpisodesList');
+  if (!listEl) return;
+
+  const countEl = document.getElementById('newEpisodesCount');
+  const titleEl = document.getElementById('newEpisodesTitle');
+
+  // Group episodes by show for a cleaner read
+  const byShow = {};
+  [...episodes, ...upcomingEpisodes].forEach(ep => {
+    if (!byShow[ep.showName]) byShow[ep.showName] = [];
+    byShow[ep.showName].push(ep);
+  });
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'Date unavailable';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric'
+    });
+  };
+
+  const listHtml = Object.entries(byShow).map(([showName, eps]) => {
+    const rows = eps.map(ep => `
+          <div class="ne-item">
+            <div class="ne-item-title">
+              <span class="ne-item-ref">S${String(ep.season).padStart(2, '0')}E${String(ep.number).padStart(2, '0')}</span>
+              <span>${escHtml(ep.name || 'Untitled')}</span>
+            </div>
+            <div class="ne-item-date">${ep.released ? 'Aired' : 'Airs'} ${formatDate(ep.airdate)}</div>
+          </div>
+        `).join('');
+    return `
+        <div class="ne-group">
+          <div class="ne-group-title">${escHtml(showName)}</div>
+          ${rows}
+        </div>
+      `;
+  }).join('');
+
+  if (titleEl) {
+    titleEl.textContent = episodes.length > 0 ? 'New Episodes Available' : 'Upcoming Episodes';
+  }
+  if (countEl) {
+    const parts = [];
+    if (episodes.length > 0) {
+      parts.push(`${episodes.length} new episode${episodes.length !== 1 ? 's' : ''} released`);
+    }
+    if (upcomingEpisodes.length > 0) {
+      parts.push(`${upcomingEpisodes.length} upcoming episode${upcomingEpisodes.length !== 1 ? 's' : ''} scheduled`);
+    }
+    countEl.textContent = parts.join(' • ');
+  }
+  listEl.innerHTML = listHtml;
+  modal.classList.add('active');
 }
