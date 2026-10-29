@@ -12,6 +12,7 @@ A Chrome Extension for tracking TV shows and episodes. Clean dark-themed interfa
 - Track progress by season and episode
 - Three status tabs: Watching, Waiting, Completed
 - Next episode air dates with streaming availability offset
+- New episodes are labelled released or upcoming from their air date
 - Genre filtering, multiple view modes (Grid, Compact, List), and sort options
 - Custom watch link per show
 - Stats dashboard (shows, episodes, estimated hours)
@@ -61,6 +62,12 @@ A Chrome Extension for tracking TV shows and episodes. Clean dark-themed interfa
 ```
 
 Settings are stored separately under `trackerSettings` (sort, active tab, view, genre filter).
+
+## Install
+
+1. Download the latest `tv-shows-tracker-vX.Y.Z.zip` from [Releases](https://github.com/DemonNCoding/TvShowsTracker/releases).
+2. Extract the archive anywhere you like.
+3. Open `chrome://extensions/`, enable **Developer mode**, click **Load unpacked**, and select the extracted folder.
 
 ## Local Development
 
